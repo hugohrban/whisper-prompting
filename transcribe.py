@@ -41,9 +41,9 @@ def process_record(
     files = sorted(os.listdir(d), key=extract_number)
     logging.info(f"Start looking for wavs in {d}... found {len(files)}")
     target_file_all = os.path.join(d, out, f"audio-all-prev{numSents}.txt")
+    gold_data_file = os.path.join(d, out, f"audio-gold.txt")
     os.makedirs(os.path.dirname(target_file_all), exist_ok=True)
-    with open(target_file_all, "w") as in_all_file:
-        pass
+    open(target_file_all, "w").close()
 
     for file in files:
         pattern = r"audio-(\d+)\.wav"
@@ -61,8 +61,7 @@ def process_record(
             )
             logging.info(f"> File: {file} \prompt {prompt} \n[ {previous} ]")
             segments, info = model.transcribe(data, beam_size=5, initial_prompt=prompt)
-            with open(target_file, "w") as file:
-                pass
+            open(target_file, "w").close()
             with open(target_file_all, "a") as in_all_file:
                 with open(target_file, "a") as in_file:
                     concat = ""
@@ -78,7 +77,10 @@ def process_record(
                             previous.append(concat)
                     print(concat, file=in_file)
                     print(concat.strip(), file=in_all_file)
-
+        elif file == "en.OSt.man.orto.txt":
+            with open(os.path.join(d, file), "r") as in_r_file:
+                with open(gold_data_file, "w") as in_w_file:
+                    print(in_r_file.read(), file=in_w_file)
         else:
             logging.debug(f"No matched by regex {pattern} - ({file})")
 
