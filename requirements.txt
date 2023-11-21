@@ -1,0 +1,7 @@
+faster-whisper
+datesets
+numpy 
+wave
+pydub
+moviepy
+pandas
