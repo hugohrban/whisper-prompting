@@ -5,3 +5,4 @@ wave
 pydub
 moviepy
 pandas
+jiwer

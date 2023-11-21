@@ -1,9 +1,11 @@
 from faster_whisper import WhisperModel
-from typing import List, Union, Any, Optional
+from typing import List, Union, Any, Optional, Dict, Tuple
 import os
 import re
 import argparse
 import logging
+from jiwer import wer
+
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -32,6 +34,63 @@ def concat_previous(str_list: Optional[List[str]]) -> str:
             result += " "
         result += clean_str
     return result
+
+
+def calculate_wer(reference: str, hypothesis: str) -> float:
+    return wer(reference, hypothesis)
+
+
+def evaluate_by_wer(d: str, out: str) -> None:
+    files = os.listdir(os.path.join(d, out))
+    gold_transcript = os.path.join(d, out, "audio-gold.txt")
+    wer_file = os.path.join(d, out, "audio-wer.txt")
+    audio_pattern = re.compile(r"audio-(\d+)-prev(\d+)\.txt")
+    with open(gold_transcript, "r") as in_file:
+        gold_text = in_file.read().strip()
+
+    groups: Dict[str, List[Tuple[str, float]]] = {}
+    for file in files:
+        match = audio_pattern.match(file)
+        if match:
+            # Extract the 'prev' number and the 'k' number
+            k_number = match.group(1)
+            prev_number = match.group(2)
+
+            # Load the transcript of the current file
+            # Assuming the transcript is stored in a similar-named text file
+            transcript_path = os.path.join(d, f"audio-{k_number}-prev{prev_number}.txt")
+            with open(transcript_path, "r") as transcript_file:
+                transcript_text = transcript_file.read().strip()
+
+            # Calculate WER
+            wer_score = calculate_wer(gold_text, transcript_text)
+
+            # Add the file and its WER score to the appropriate group
+            if prev_number not in groups:
+                groups[prev_number] = []
+            groups[prev_number].append((file, wer_score))
+
+    # Sort files in each group by k_number
+    for prev in groups:
+        groups[prev].sort(key=lambda x: extract_number(x[0]))
+
+    # Print the groups and their WER scores
+    open(wer_file, "w").close()
+    # Writing to the WER file
+    with open(wer_file, "w") as in_wer_file:
+        for prev, file_data in groups.items():
+            # Calculate WER for the audio-all-prev{i}.txt file
+            all_transcript_path = os.path.join(d, out, f"audio-all-prev{prev}.txt")
+            with open(all_transcript_path, "r") as all_transcript_file:
+                all_transcript_text = all_transcript_file.read().strip()
+            all_wer = calculate_wer(gold_text, all_transcript_text)
+
+            print(f"Previous sents {prev}:", file=in_wer_file)
+            for file, score in file_data:
+                print(f"  File: {file}, WER: {score:.2f}", file=in_wer_file)
+            print(
+                f"Total WER for audio-all-prev{prev}: {all_wer:.2f}\n", file=in_wer_file
+            )
 
 
 def process_record(
@@ -84,6 +143,8 @@ def process_record(
         else:
             logging.debug(f"No matched by regex {pattern} - ({file})")
 
+    evaluate_by_wer(d, out)
+
 
 def process_all(
     input_prefix: str,
@@ -127,7 +188,6 @@ def parse_args():
         action="store_true",
         help="Process all records instead of a single record",
     )
-
     return parser.parse_args()
 
 
@@ -146,5 +206,7 @@ if args.all:
     logging.info(f"Job done! (process_all)")
 else:
     logging.info(f"Start processing record on path {path}")
-    process_record(whisper, path, args.out, args.num_sents)
+
+    evaluate_by_wer(path, args.out)
+    # process_record(whisper, path, args.out, args.num_sents)
     logging.info(f"Job done! (process_record)")
