@@ -5,6 +5,7 @@ import re
 import argparse
 import logging
 from jiwer import wer
+from align_wer import open_transform, nice_alignments, process_asr_align
 
 
 logging.basicConfig(level=logging.DEBUG)
@@ -70,12 +71,8 @@ def evaluate_by_wer(d: str, out: str) -> None:
             with open(transcript_path, "r") as transcript_file:
                 transcript_text = transcript_file.read().strip()
 
-            print(k_number, prev_number)
             # Calculate WER
             wer_score = calculate_wer(gold_text[int(k_number) - 1], transcript_text)
-            print(
-                f"Calculated WER {wer_score} for:\n<g>:{gold_text}\n<t>:{transcript_text}"
-            )
 
             # Add the file and its WER score to the appropriate group
             if prev_number not in groups:
@@ -100,6 +97,19 @@ def evaluate_by_wer(d: str, out: str) -> None:
             print(f"Previous sents {prev}:", file=in_wer_file)
             for file, score in file_data:
                 print(f"  File: {file}, WER: {score:.2f}", file=in_wer_file)
+
+                # Call the alignment script
+                gold_fn = os.path.join(
+                    d, out, f"audio-{extract_number_eval_prev(file)}-gold.txt"
+                )
+                asr_fn = os.path.join(d, out, file)
+                tA, tB, ts = open_transform(gold_fn, asr_fn)
+                na = nice_alignments(tA, tB)
+                alignment_output = process_asr_align(tA, tB, na)
+
+                # Print the alignment results
+                for line in alignment_output:
+                    print(line, file=in_wer_file)
             print(
                 f"Total WER for audio-all-prev{prev}: {all_wer:.2f}\n", file=in_wer_file
             )
