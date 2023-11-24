@@ -16,6 +16,13 @@ def initialize_whisper(
     return WhisperModel(model_size, device=device, compute_type=compute_type)
 
 
+def extract_number_eval_prev(filename: str) -> int:
+    match = re.search(r"audio-(\d+)-prev(\d+)\.txt", filename)
+    if match:
+        return int(match.group(1))
+    return -1
+
+
 def extract_number(filename: str) -> int:
     match = re.search(r"audio-(\d+)\.wav", filename)
     if match:
@@ -41,12 +48,13 @@ def calculate_wer(reference: str, hypothesis: str) -> float:
 
 
 def evaluate_by_wer(d: str, out: str) -> None:
-    files = os.listdir(os.path.join(d, out))
+    files = sorted(os.listdir(os.path.join(d, out)), key=extract_number_eval_prev)
+    print("files", files)
     gold_transcript = os.path.join(d, out, "audio-gold.txt")
     wer_file = os.path.join(d, out, "audio-wer.txt")
     audio_pattern = re.compile(r"audio-(\d+)-prev(\d+)\.txt")
     with open(gold_transcript, "r") as in_file:
-        gold_text = in_file.read().strip()
+        gold_text = in_file.read().strip().split("\n")
 
     groups: Dict[str, List[Tuple[str, float]]] = {}
     for file in files:
@@ -62,8 +70,12 @@ def evaluate_by_wer(d: str, out: str) -> None:
             with open(transcript_path, "r") as transcript_file:
                 transcript_text = transcript_file.read().strip()
 
+            print(k_number, prev_number)
             # Calculate WER
-            wer_score = calculate_wer(gold_text, transcript_text)
+            wer_score = calculate_wer(gold_text[int(k_number) - 1], transcript_text)
+            print(
+                f"Calculated WER {wer_score} for:\n<g>:{gold_text}\n<t>:{transcript_text}"
+            )
 
             # Add the file and its WER score to the appropriate group
             if prev_number not in groups:
@@ -83,7 +95,7 @@ def evaluate_by_wer(d: str, out: str) -> None:
             all_transcript_path = os.path.join(d, out, f"audio-all-prev{prev}.txt")
             with open(all_transcript_path, "r") as all_transcript_file:
                 all_transcript_text = all_transcript_file.read().strip()
-            all_wer = calculate_wer(gold_text, all_transcript_text)
+            all_wer = calculate_wer("\n".join(gold_text), all_transcript_text)
 
             print(f"Previous sents {prev}:", file=in_wer_file)
             for file, score in file_data:
@@ -193,9 +205,10 @@ def parse_args():
 
 args = parse_args()
 
-logging.info("Start initializing whisper...")
-whisper = initialize_whisper(args.model_size, args.device, args.compute_type)
-logging.info("Whisper initialized")
+
+# logging.info("Start initializing whisper...")
+# whisper = initialize_whisper(args.model_size, args.device, args.compute_type)
+# logging.info("Whisper initialized")
 
 logging.info(f"Output file set to be {args.out}")
 
