@@ -67,7 +67,9 @@ def evaluate_by_wer(d: str, out: str) -> None:
 
             # Load the transcript of the current file
             # Assuming the transcript is stored in a similar-named text file
-            transcript_path = os.path.join(d, f"audio-{k_number}-prev{prev_number}.txt")
+            transcript_path = os.path.join(
+                d, out, f"audio-{k_number}-prev{prev_number}.txt"
+            )
             with open(transcript_path, "r") as transcript_file:
                 transcript_text = transcript_file.read().strip()
 
@@ -191,7 +193,7 @@ def parse_args():
     parser.add_argument("input_prefix", type=str, help="Path prefix to the input files")
     parser.add_argument("out", type=str, help="Output dir for results")
     parser.add_argument(
-        "--model_size", type=str, default="large-v2", help="Size of the Whisper model"
+        "--model_size", type=str, default="large-v3", help="Size of the Whisper model"
     )
     parser.add_argument(
         "--device", type=str, default="cpu", help="Device to use for computation"
@@ -216,9 +218,9 @@ def parse_args():
 args = parse_args()
 
 
-# logging.info("Start initializing whisper...")
-# whisper = initialize_whisper(args.model_size, args.device, args.compute_type)
-# logging.info("Whisper initialized")
+logging.info("Start initializing whisper...")
+whisper = initialize_whisper(args.model_size, args.device, args.compute_type)
+logging.info("Whisper initialized")
 
 logging.info(f"Output file set to be {args.out}")
 
@@ -230,6 +232,6 @@ if args.all:
 else:
     logging.info(f"Start processing record on path {path}")
 
+    process_record(whisper, path, args.out, args.num_sents)
     evaluate_by_wer(path, args.out)
-    # process_record(whisper, path, args.out, args.num_sents)
     logging.info(f"Job done! (process_record)")
